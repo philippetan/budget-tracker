@@ -15,14 +15,23 @@ export function HomeActions() {
 
   if (session?.user) {
     return (
-      <Button render={<Link href="/dashboard" />}>Go to dashboard</Button>
+      <Button nativeButton={false} render={<Link href="/dashboard" />}>
+        Go to dashboard
+      </Button>
     );
   }
 
   return (
     <>
-      <Button render={<Link href="/auth/sign-up" />}>Get started</Button>
-      <Button variant="outline" render={<Link href="/auth/sign-in" />}>
+      {/* nativeButton={false}: these render as links (<a>), not <button>s. */}
+      <Button nativeButton={false} render={<Link href="/auth/sign-up" />}>
+        Get started
+      </Button>
+      <Button
+        variant="outline"
+        nativeButton={false}
+        render={<Link href="/auth/sign-in" />}
+      >
         Sign in
       </Button>
     </>
