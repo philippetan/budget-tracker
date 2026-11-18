@@ -1,0 +1,13 @@
+// Prisma manages only the `public` schema (the app's own tables).
+// Users and sessions live in the `neon_auth` schema, owned by Neon Auth:
+// never add it here or run migrations against it. To link a row to its owner,
+// store the user's id in a column such as `userId String @db.Uuid`.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
