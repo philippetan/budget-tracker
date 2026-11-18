@@ -1,6 +1,4 @@
-import Link from "next/link";
-
-import { Button } from "@/components/ui/button";
+import { HomeActions } from "@/components/home-actions";
 
 // Placeholder for the public showcase site.
 export default function Home() {
@@ -11,10 +9,7 @@ export default function Home() {
         Track your budget and manage your expenses in one place.
       </p>
       <div className="flex gap-3">
-        <Button render={<Link href="/auth/sign-up" />}>Get started</Button>
-        <Button variant="outline" render={<Link href="/auth/sign-in" />}>
-          Sign in
-        </Button>
+        <HomeActions />
       </div>
     </main>
   );
