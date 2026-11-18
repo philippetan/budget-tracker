@@ -2,6 +2,14 @@
 // Users and sessions live in the `neon_auth` schema, owned by Neon Auth:
 // never add it here or run migrations against it. To link a row to its owner,
 // store the user's id in a column such as `userId String @db.Uuid`.
+//
+// Conventions:
+// - All money is Philippine pesos (PHP). It's stored as whole centavos in
+//   `...Cents` columns (₱1,250.50 = 125050), never as floats. Amounts are
+//   always positive; `type` gives the direction. Int allows up to ₱21,474,836.47.
+// - Every table has a `userId`. Queries must always filter by the signed-in
+//   user's id, and server actions must check that any referenced account or
+//   category belongs to that same user.
 
 generator client {
   provider = "prisma-client"
@@ -10,4 +18,124 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum AccountType {
+  CASH
+  BANK
+  CREDIT_CARD
+  SAVINGS
+  E_WALLET
+  OTHER
+}
+
+// Where money is held: a wallet, bank account, card, etc.
+model Account {
+  id                  String        @id @default(uuid(7)) @db.Uuid
+  userId              String        @db.Uuid
+  name                String        @db.VarChar(100)
+  type                AccountType   @default(CASH)
+  // Balance when the account was added. Current balance =
+  // initial + income - expenses + transfers in - transfers out.
+  initialBalanceCents Int           @default(0)
+  // Archived accounts are hidden from pickers but keep their history.
+  archivedAt          DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  transactions        Transaction[]
+  transfersOut        Transfer[]    @relation("TransferFrom")
+  transfersIn         Transfer[]    @relation("TransferTo")
+
+  @@unique([userId, name])
+  @@map("accounts")
+}
+
+// Labels for income or expenses, e.g. "Food", "Rent", "Salary".
+model Category {
+  id           String          @id @default(uuid(7)) @db.Uuid
+  userId       String          @db.Uuid
+  name         String          @db.VarChar(50)
+  type         TransactionType
+  // Optional hex colour like "#22c55e".
+  color        String?         @db.VarChar(7)
+  // Lucide icon name in kebab-case, e.g. "utensils". Every category has one.
+  // Must be one of the icons offered in the app's icon picker (checked with Zod).
+  icon         String          @default("tag") @db.VarChar(50)
+  archivedAt   DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@unique([userId, type, name])
+  @@map("categories")
+}
+
+// A single income or expense entry.
+model Transaction {
+  id          String          @id @default(uuid(7)) @db.Uuid
+  userId      String          @db.Uuid
+  type        TransactionType
+  amountCents Int
+  // Calendar date of the transaction (no time of day).
+  occurredOn  DateTime        @db.Date
+  note        String?         @db.VarChar(500)
+  accountId   String          @db.Uuid
+  // Accounts with transactions can't be deleted, only archived.
+  account     Account         @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  categoryId  String?         @db.Uuid
+  // Deleting a category leaves its transactions uncategorised.
+  category    Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([userId, occurredOn(sort: Desc)])
+  @@index([accountId])
+  @@index([categoryId])
+  @@map("transactions")
+}
+
+// Money moved between two of the user's own accounts, e.g. Cash -> GoTyme.
+// Changes both balances but is neither income nor an expense, so it never
+// counts toward spending totals or budgets. A transfer fee is recorded as a
+// separate expense transaction.
+model Transfer {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  userId        String   @db.Uuid
+  amountCents   Int
+  occurredOn    DateTime @db.Date
+  note          String?  @db.VarChar(500)
+  fromAccountId String   @db.Uuid
+  fromAccount   Account  @relation("TransferFrom", fields: [fromAccountId], references: [id], onDelete: Restrict)
+  toAccountId   String   @db.Uuid
+  toAccount     Account  @relation("TransferTo", fields: [toAccountId], references: [id], onDelete: Restrict)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, occurredOn(sort: Desc)])
+  @@index([fromAccountId])
+  @@index([toAccountId])
+  @@map("transfers")
+}
+
+// A monthly spending limit for one expense category.
+model Budget {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  userId      String   @db.Uuid
+  categoryId  String   @db.Uuid
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  // First day of the month the budget applies to, e.g. 2026-11-01.
+  month       DateTime @db.Date
+  amountCents Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([categoryId, month])
+  @@index([userId, month])
+  @@map("budgets")
 }
