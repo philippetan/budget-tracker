@@ -5,24 +5,15 @@ import { z } from "zod";
 
 import { requireUserId } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { Prisma } from "@/lib/generated/prisma/client";
+import { isPrismaError, type ActionResult as Result } from "@/lib/actions";
 import {
   accountFormSchema,
   type AccountFormInput,
-  type FieldErrors,
 } from "@/lib/validations/account";
 
-export type ActionResult =
-  | { ok: true }
-  | { ok: false; message?: string; fieldErrors?: FieldErrors };
+type ActionResult = Result<AccountFormInput>;
 
 const accountId = z.uuid();
-
-function isPrismaError(error: unknown, code: string) {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError && error.code === code
-  );
-}
 
 function duplicateName(name: string): ActionResult {
   return {
