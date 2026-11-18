@@ -9,8 +9,12 @@ export default defineConfig({
       // Default branch: no overrides, uses project defaults
       return {};
     }
+    if (branch.name === "dev") {
+      // Long-lived development branch: never expires
+      return {};
+    }
     if (!branch.exists) {
-      // New non-default branches: auto-expire
+      // New feature branches: auto-expire
       // Run `neon checkout <name>` to create a new branch with these settings
       return { ttl: "7d" };
     }

@@ -8,6 +8,10 @@ A budget tracker and expense manager app, built with Next.js.
 - **Auth**: visitors register and log in to use the app.
 - **App**: the budget tracker / expense manager, available only to signed-in users.
 
+### Currency
+
+The app uses one currency for everyone: Philippine pesos (PHP). Store amounts as whole centavos (integers) and display them with `Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" })`, e.g. ₱1,250.50. There's no per-user currency setting.
+
 ### Stack
 
 - **Framework**: Next.js 16 (App Router), React 19, Tailwind CSS 4.
