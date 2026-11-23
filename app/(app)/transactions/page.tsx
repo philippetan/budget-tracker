@@ -1,14 +1,9 @@
-import {
-  ArrowLeftRightIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  PlusIcon,
-  ReceiptTextIcon,
-} from "lucide-react";
+import { ArrowLeftRightIcon, PlusIcon, ReceiptTextIcon } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
+import { MonthNav } from "@/components/app-shell/month-nav";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { CategoryIcon } from "@/components/categories/category-icon";
 import { TransactionFormOptionsProvider } from "@/components/transactions/form-options";
@@ -29,7 +24,6 @@ import {
   formatDayHeading,
   formatMonth,
   parseMonth,
-  shiftMonth,
   type MonthKey,
 } from "@/lib/dates";
 import { formatPeso } from "@/lib/money";
@@ -78,7 +72,7 @@ async function TransactionsContent({
     <TransactionFormOptionsProvider options={options}>
       <div className="flex flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <MonthNav month={month} filter={filter} />
+          <MonthNav month={month} hrefFor={(m) => href(m, filter)} />
           <TransactionFormDialog
             defaultMode={filter === "INCOME" || filter === "TRANSFER" ? filter : "EXPENSE"}
             trigger={
@@ -113,45 +107,6 @@ function href(month: MonthKey, filter: ActivityFilter) {
   if (filter !== "ALL") params.set("type", filter);
   const query = params.toString();
   return query ? `/transactions?${query}` : "/transactions";
-}
-
-function MonthNav({ month, filter }: { month: MonthKey; filter: ActivityFilter }) {
-  const isCurrent = month === currentMonth();
-  return (
-    <div className="flex items-center gap-1">
-      <Button
-        variant="outline"
-        size="icon"
-        nativeButton={false}
-        render={<Link href={href(shiftMonth(month, -1), filter)} />}
-        aria-label="Previous month"
-      >
-        <ChevronLeftIcon />
-      </Button>
-      <span className="min-w-36 text-center font-medium">
-        {formatMonth(month)}
-      </span>
-      <Button
-        variant="outline"
-        size="icon"
-        nativeButton={false}
-        render={<Link href={href(shiftMonth(month, 1), filter)} />}
-        aria-label="Next month"
-      >
-        <ChevronRightIcon />
-      </Button>
-      {!isCurrent ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          nativeButton={false}
-          render={<Link href={href(currentMonth(), filter)} />}
-        >
-          This month
-        </Button>
-      ) : null}
-    </div>
-  );
 }
 
 function Summary({
