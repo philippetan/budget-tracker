@@ -1,13 +1,12 @@
-import { ArrowLeftRightIcon, PlusIcon, ReceiptTextIcon } from "lucide-react";
+import { PlusIcon, ReceiptTextIcon } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
 import { MonthNav } from "@/components/app-shell/month-nav";
 import { PageHeader } from "@/components/app-shell/page-header";
-import { CategoryIcon } from "@/components/categories/category-icon";
 import { TransactionFormOptionsProvider } from "@/components/transactions/form-options";
-import { TransactionActionsMenu } from "@/components/transactions/transaction-actions-menu";
+import { ActivityRow } from "@/components/transactions/activity-row";
 import { TransactionFormDialog } from "@/components/transactions/transaction-form-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -186,51 +185,6 @@ function ActivityList({ items }: { items: ActivityItem[] }) {
         </section>
       ))}
     </div>
-  );
-}
-
-function ActivityRow({ item }: { item: ActivityItem }) {
-  const isTransfer = item.kind === "transfer";
-  const title = isTransfer
-    ? "Transfer"
-    : (item.category?.name ?? "Uncategorised");
-  const accountLine = isTransfer
-    ? `${item.fromAccountName} → ${item.toAccountName}`
-    : item.accountName;
-
-  const amount = isTransfer
-    ? formatPeso(item.amountCents)
-    : `${item.type === "INCOME" ? "+" : "−"}${formatPeso(item.amountCents)}`;
-  const amountClass = isTransfer
-    ? "text-muted-foreground"
-    : item.type === "INCOME"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : "";
-
-  return (
-    <li className="flex items-center gap-3 px-4 py-3">
-      {isTransfer ? (
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          <ArrowLeftRightIcon className="size-5" />
-        </div>
-      ) : (
-        <CategoryIcon
-          icon={item.category?.icon ?? "tag"}
-          color={item.category?.color ?? null}
-        />
-      )}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate font-medium">{title}</span>
-        <span className="truncate text-sm text-muted-foreground">
-          {accountLine}
-          {item.note ? ` · ${item.note}` : ""}
-        </span>
-      </div>
-      <span className={`shrink-0 font-semibold tabular-nums ${amountClass}`}>
-        {amount}
-      </span>
-      <TransactionActionsMenu item={item} />
-    </li>
   );
 }
 
