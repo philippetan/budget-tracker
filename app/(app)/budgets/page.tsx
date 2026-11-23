@@ -6,12 +6,16 @@ import { MonthNav } from "@/components/app-shell/month-nav";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { BudgetActionsMenu } from "@/components/budgets/budget-actions-menu";
 import { BudgetFormDialog } from "@/components/budgets/budget-form-dialog";
+import {
+  BUDGET_TEXT_CLASS,
+  BudgetProgress,
+  budgetStatus,
+} from "@/components/budgets/budget-progress";
 import { CopyBudgetsButton } from "@/components/budgets/copy-budgets-button";
 import { CategoryIcon } from "@/components/categories/category-icon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUserId } from "@/lib/auth/session";
 import {
@@ -27,9 +31,6 @@ import {
   type MonthKey,
 } from "@/lib/dates";
 import { formatPeso } from "@/lib/money";
-
-// A budget turns amber once this share of it is spent, and red when it's over.
-const WARN_AT = 0.8;
 
 export default function BudgetsPage({ searchParams }: PageProps<"/budgets">) {
   return (
@@ -187,15 +188,7 @@ function Summary({ month, budgets }: { month: MonthKey; budgets: BudgetItem[] })
 function BudgetRow({ budget, month }: { budget: BudgetItem; month: MonthKey }) {
   const { category, amountCents } = budget;
   const spent = category.spentCents;
-  const ratio = spent / amountCents;
-  const over = spent > amountCents;
-  const warn = !over && ratio >= WARN_AT;
-
-  const indicator = over
-    ? "[&_[data-slot=progress-indicator]]:bg-destructive"
-    : warn
-      ? "[&_[data-slot=progress-indicator]]:bg-amber-500"
-      : "";
+  const status = budgetStatus(spent, amountCents);
 
   return (
     <li className="flex flex-col gap-3 px-4 py-4">
@@ -213,21 +206,20 @@ function BudgetRow({ budget, month }: { budget: BudgetItem; month: MonthKey }) {
           </span>
         </div>
         <div className="flex shrink-0 flex-col items-end">
-          <span
-            className={`font-semibold tabular-nums ${over ? "text-destructive" : warn ? "text-amber-600 dark:text-amber-400" : ""}`}
-          >
+          <span className={`font-semibold tabular-nums ${BUDGET_TEXT_CLASS[status]}`}>
             {formatPeso(Math.abs(amountCents - spent))}
           </span>
           <span className="text-xs text-muted-foreground">
-            {over ? "over" : "left"}
+            {status === "over" ? "over" : "left"}
           </span>
         </div>
         <BudgetActionsMenu budget={budget} month={month} />
       </div>
-      <Progress
-        value={Math.min(ratio, 1) * 100}
-        aria-label={`${category.name}: ${Math.round(ratio * 100)}% of budget spent`}
-        className={`sm:ml-13 [&_[data-slot=progress-track]]:h-2 ${indicator}`}
+      <BudgetProgress
+        name={category.name}
+        spentCents={spent}
+        amountCents={amountCents}
+        className="sm:ml-13"
       />
     </li>
   );

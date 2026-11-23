@@ -3,6 +3,7 @@ import "server-only";
 import { ensureStarterCategories } from "@/lib/data/categories";
 import { dateToISO, monthRange, type MonthKey } from "@/lib/dates";
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import type { AccountType, TransactionType } from "@/lib/generated/prisma/enums";
 
 export type ActivityFilter = "ALL" | "EXPENSE" | "INCOME" | "TRANSFER";
@@ -43,48 +44,34 @@ export type MonthActivity = {
   expenseCents: number;
 };
 
-/** A month's transactions and transfers, newest first. */
-export async function getMonthActivity(
-  userId: string,
-  month: MonthKey,
-  filter: ActivityFilter,
-): Promise<MonthActivity> {
-  const { start, end } = monthRange(month);
-  const inMonth = { userId, occurredOn: { gte: start, lt: end } };
-  const newestFirst = [
-    { occurredOn: "desc" as const },
-    { createdAt: "desc" as const },
-  ];
+const transactionInclude = {
+  account: { select: { name: true } },
+  category: { select: { name: true, icon: true, color: true } },
+} as const;
 
-  const [transactions, transfers, totals] = await Promise.all([
-    filter === "TRANSFER"
-      ? []
-      : prisma.transaction.findMany({
-          where: filter === "ALL" ? inMonth : { ...inMonth, type: filter },
-          include: {
-            account: { select: { name: true } },
-            category: { select: { name: true, icon: true, color: true } },
-          },
-          orderBy: newestFirst,
-        }),
-    filter === "ALL" || filter === "TRANSFER"
-      ? prisma.transfer.findMany({
-          where: inMonth,
-          include: {
-            fromAccount: { select: { name: true } },
-            toAccount: { select: { name: true } },
-          },
-          orderBy: newestFirst,
-        })
-      : [],
-    prisma.transaction.groupBy({
-      by: ["type"],
-      where: inMonth,
-      _sum: { amountCents: true },
-    }),
-  ]);
+const transferInclude = {
+  fromAccount: { select: { name: true } },
+  toAccount: { select: { name: true } },
+} as const;
 
-  const items: ActivityItem[] = [
+const newestFirst = [
+  { occurredOn: "desc" as const },
+  { createdAt: "desc" as const },
+];
+
+type TransactionRow = Prisma.TransactionGetPayload<{
+  include: typeof transactionInclude;
+}>;
+type TransferRow = Prisma.TransferGetPayload<{
+  include: typeof transferInclude;
+}>;
+
+/** Turns database rows into one list, newest first. */
+function mergeActivity(
+  transactions: TransactionRow[],
+  transfers: TransferRow[],
+): ActivityItem[] {
+  return [
     ...transactions.map(
       (t): TransactionItem => ({
         kind: "transaction",
@@ -118,6 +105,62 @@ export async function getMonthActivity(
     (a, b) =>
       b.occurredOn.localeCompare(a.occurredOn) || b.createdAt - a.createdAt,
   );
+}
+
+/** The latest transactions and transfers across all months. */
+export async function getRecentActivity(
+  userId: string,
+  limit: number,
+): Promise<ActivityItem[]> {
+  const [transactions, transfers] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { userId },
+      include: transactionInclude,
+      orderBy: newestFirst,
+      take: limit,
+    }),
+    prisma.transfer.findMany({
+      where: { userId },
+      include: transferInclude,
+      orderBy: newestFirst,
+      take: limit,
+    }),
+  ]);
+  return mergeActivity(transactions, transfers).slice(0, limit);
+}
+
+/** A month's transactions and transfers, newest first. */
+export async function getMonthActivity(
+  userId: string,
+  month: MonthKey,
+  filter: ActivityFilter,
+): Promise<MonthActivity> {
+  const { start, end } = monthRange(month);
+  const inMonth = { userId, occurredOn: { gte: start, lt: end } };
+
+  const [transactions, transfers, totals] = await Promise.all([
+    filter === "TRANSFER"
+      ? []
+      : prisma.transaction.findMany({
+          where: filter === "ALL" ? inMonth : { ...inMonth, type: filter },
+          include: transactionInclude,
+          orderBy: newestFirst,
+        }),
+    filter === "ALL" || filter === "TRANSFER"
+      ? prisma.transfer.findMany({
+          where: inMonth,
+          include: transferInclude,
+          orderBy: newestFirst,
+        })
+      : [],
+    prisma.transaction.groupBy({
+      by: ["type"],
+      where: inMonth,
+      _sum: { amountCents: true },
+    }),
+  ]);
+
+  const items = mergeActivity(transactions, transfers);
 
   const sumOf = (type: TransactionType) =>
     totals.find((row) => row.type === type)?._sum.amountCents ?? 0;
